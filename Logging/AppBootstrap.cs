@@ -1,3 +1,4 @@
+using LoggingTestingContraints.Math;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -5,9 +6,9 @@ using Serilog.Formatting.Compact;
 
 namespace LoggingTestingContraints.Logging;
 
-public static class LoggingBootstrap
+public static class AppBootstrap
 {
-    public static ILoggerFactory CreateLoggerFactory()
+    public static ServiceProvider CreateServices()
     {
         Directory.CreateDirectory("logs");
 
@@ -20,9 +21,11 @@ public static class LoggingBootstrap
                 rollingInterval: RollingInterval.Day)
             .CreateLogger();
 
-        return LoggerFactory.Create(builder =>
-        {
-            builder.AddSerilog(dispose: true);
-        });
+        var services = new ServiceCollection();
+
+        services.AddLogging(builder => builder.AddSerilog(dispose: true));
+        services.AddSingleton<IIntegerMath, IntegerMath>();
+
+        return services.BuildServiceProvider();
     }
 }

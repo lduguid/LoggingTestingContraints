@@ -28,13 +28,31 @@ dotnet test --filter "FullyQualifiedName~ClassName"
 
 Use `Microsoft.Extensions.Logging` (via `ILogger<T>`) — never `Console.WriteLine` for application logic.
 
-- Inject or create `ILogger<T>` for each class that emits diagnostics.
+- **Inject** `ILogger<T>` through the constructor; do not pass loggers as method parameters.
+- Register services in `Logging/AppBootstrap.cs` via `Microsoft.Extensions.DependencyInjection`.
+- Resolve dependencies at the composition root (`Program.cs`) with `GetRequiredService<T>()`.
 - Use structured placeholders: `logger.LogInformation("Processed {Count} items", count)` — not string interpolation.
 - Log at appropriate levels: `Trace`, `Debug`, `Information`, `Warning`, `Error`, `Critical`.
 - Serilog writes JSON logs to `logs/` so output can be replayed, diffed, and used for regression analysis.
 - When investigating bugs or regressions, compare log files across runs before changing behavior.
 
 **Do not** remove or downgrade existing log statements without explicit reason.
+
+### DI pattern
+
+```csharp
+// AppBootstrap.cs — register once
+services.AddLogging(builder => builder.AddSerilog(dispose: true));
+services.AddSingleton<IMyService, MyService>();
+
+// MyService.cs — logger injected at construction
+public sealed class MyService(ILogger<MyService> logger) : IMyService { ... }
+
+// Program.cs — resolve at entry point
+var myService = services.GetRequiredService<IMyService>();
+```
+
+In unit tests, construct the class directly with `NullLogger<T>.Instance` — no container needed for isolated tests.
 
 ---
 
@@ -52,15 +70,18 @@ Every non-trivial function must document and enforce its contract.
 ### Example
 
 ```csharp
-/// <summary>Computes the absolute value of an integer.</summary>
-/// <precondition>none</precondition>
-/// <postcondition>result >= 0</postcondition>
-public static int Abs(int value)
+public sealed class IntegerMath(ILogger<IntegerMath> logger) : IIntegerMath
 {
-    Contract.Require(true, "no preconditions");
-    var result = value < 0 ? -value : value;
-    Contract.Ensure(result >= 0, "result must be non-negative");
-    return result;
+    /// <summary>Computes the absolute value of an integer.</summary>
+    /// <precondition>none</precondition>
+    /// <postcondition>result >= 0</postcondition>
+    public int Abs(int value)
+    {
+        Contract.Require(true, "no preconditions");
+        var result = value < 0 ? -value : value;
+        Contract.Ensure(result >= 0, "result must be non-negative");
+        return result;
+    }
 }
 ```
 

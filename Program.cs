@@ -1,13 +1,16 @@
 ﻿using LoggingTestingContraints.Logging;
 using LoggingTestingContraints.Math;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-var loggerFactory = LoggingBootstrap.CreateLoggerFactory();
-var logger = loggerFactory.CreateLogger("Program");
+await using var services = AppBootstrap.CreateServices();
+
+var logger = services.GetRequiredService<ILogger<Program>>();
+var integerMath = services.GetRequiredService<IIntegerMath>();
 
 logger.LogInformation("Application starting");
 
-var sample = IntegerMath.Abs(-42, loggerFactory.CreateLogger("IntegerMath"));
+var sample = integerMath.Abs(-42);
 logger.LogInformation("Sample absolute value computed: {Value}", sample);
 
 logger.LogInformation("Application finished");
