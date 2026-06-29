@@ -12,19 +12,19 @@ public static class AppBootstrap
     {
         Directory.CreateDirectory("logs");
 
+        var logPath = $"logs/log-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.Console()
-            .WriteTo.File(
-                new CompactJsonFormatter(),
-                path: "logs/log-.json",
-                rollingInterval: RollingInterval.Day)
+            .WriteTo.File(new CompactJsonFormatter(), path: logPath)
             .CreateLogger();
 
         var services = new ServiceCollection();
 
         services.AddLogging(builder => builder.AddSerilog(dispose: true));
         services.AddSingleton<IIntegerMath, IntegerMath>();
+        services.AddSingleton<ICalculator, Calculator>();
 
         return services.BuildServiceProvider();
     }

@@ -54,6 +54,8 @@ var myService = services.GetRequiredService<IMyService>();
 
 In unit tests, construct the class directly with `NullLogger<T>.Instance` — no container needed for isolated tests.
 
+Use `LoggingTestingContraints.Tests/Integration/DiIntegrationTests.cs` to verify `AppBootstrap` wiring end-to-end.
+
 ---
 
 ## Core practice 2: Function contracts (pre/post conditions)
@@ -84,6 +86,29 @@ public sealed class IntegerMath(ILogger<IntegerMath> logger) : IIntegerMath
     }
 }
 ```
+
+### Worked example: runtime guard + contract (`SafeDivide`)
+
+When a precondition can be violated by callers, enforce it at runtime **first**, then assert the contract in DEBUG on the path that continues:
+
+```csharp
+public int SafeDivide(int a, int b)
+{
+    // Runtime enforcement — all builds; unit tests assert this
+    if (b == 0)
+        throw new ArgumentOutOfRangeException(nameof(b), b, "divisor must not be zero");
+
+    // DEBUG-only contract echo (after guard; documents valid-path invariant)
+    Contract.Require(b != 0, "divisor must not be zero");
+
+    var result = a / b;
+
+    Contract.Ensure(result == a / b, "result must equal quotient of operands");
+    return result;
+}
+```
+
+**Why guard before `Require`?** `Contract.Require` uses `Debug.Assert`, which aborts in DEBUG before your `throw` runs. Tests and Release builds must see the same `ArgumentOutOfRangeException`, not `DebugAssertException`.
 
 ### Breaking a contract
 
@@ -134,6 +159,30 @@ When asked to implement a feature:
 
 ## Logging output location
 
-- JSON logs: `logs/log-.json` (rolling daily)
+- JSON logs: `logs/log-yyyyMMdd-HHmmss.json` (one file per run)
 - Console: human-readable during development
 - `logs/` is gitignored — do not commit log files
+
+### Log replay / regression
+
+`Demo/CalculatorScenario.cs` runs a fixed scripted scenario (`CalculatorLearningDemo`) with structured `{ScenarioName}`, `{Step}`, and `{Result}` properties in each Information log entry.
+
+Scripts in `scripts/` (run from project root):
+
+```powershell
+dotnet run
+
+# list recent log files
+.\scripts\List-Logs.ps1
+
+# compare two specific runs (behavioral — timestamps ignored)
+.\scripts\Compare-Logs.ps1 logs\log-20260628-195903.json logs\log-20260628-195934.json
+
+# compare the two most recent runs
+.\scripts\Compare-Logs.ps1 -Latest
+
+# include timestamp differences
+.\scripts\Compare-Logs.ps1 -Latest -Raw
+```
+
+Identical inputs should produce identical JSON log lines (except timestamps). Diff logs before changing behavior when investigating regressions. `Compare-Logs.ps1` exits `0` when logs match, `1` when they differ.
